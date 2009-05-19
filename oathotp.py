@@ -24,6 +24,13 @@ class AdminPage(webapp.RequestHandler):
       self.response.out.write("<br><a href=%s>Logout</a>" % users.create_logout_url(self.request.uri))
       self.response.out.write("</body></html>")
     elif user and users.is_current_user_admin():
+      #if id=self.request.get('writeme') = 1:
+#      if 1:
+#        hdata = HotpData(id='5551234',
+#          serialno='DEV-012345',
+#          salt='5882300',
+#          secret='9998887766')
+#        hdata.put()
       self.response.out.write("<html><head></head><body>\n")
       self.response.out.write("add a new value\n")
       self.response.out.write("""
