@@ -8,5 +8,14 @@ handlers:
    static_files: favicon.ico
    upload: favicon.ico
 
+ - url: /otp
+   script: oathotp.py
+   secure: always
+
+ - url: /admin
+   script: oathotp.py
+   secure: always
+
  - url: /.*
    script: oathotp.py
+   secure: optional
