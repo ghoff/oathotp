@@ -31,6 +31,7 @@ class OTPGenerator(object):
 	def __init__(self, config):
 		"""Initializes a new OTPGenerator, by using configuration parameters"""
 		self._config = config
+		self._config['blocksize'] = 16
 
 	def _hashStr(self, code):
 		hdata = hashlib.sha1(code)
@@ -50,8 +51,9 @@ class OTPGenerator(object):
 
 	def _addPadding(self, buffer):
 		blocksize = self._config['blocksize']
-		pad = blocksize - (len(data) % blocksize)
-		data = data + pad * chr(pad)
+		pad = blocksize - (len(buffer) % blocksize)
+		buffer = buffer + pad * chr(pad)
+		return buffer
 
 	def _decryptKey(self, key, iv, buffer):
 		cipher = AES.new(key[:16], AES.MODE_CBC, iv)
@@ -92,20 +94,26 @@ class OTPGenerator(object):
 	
 	def getOTP(self):
 		"""Returns a genarator object for creating OTP's"""
-		while True:
-			decryptedKey = self._decryptKey(self._hashStr(self._config['pincode']), 
-				self._hexStringToString(self._config['iv']),
-				self._hexStringToString(self._config['seed']))
+		decryptedKey = self._decryptKey(self._hashStr(self._config['pincode']), 
+			self._hexStringToString(self._config['iv']),
+			self._hexStringToString(self._config['seed']))
 
-			counter = self._hexStringToString(hex(self._config['counter']))
-			counter = '\0'*(8-len(counter))+counter
-			hashedKey = self._hashKeys(decryptedKey,counter)
-			#print "".join("%02x" % b for b in hashedKey)
+		counter = self._hexStringToString(hex(self._config['counter']))
+		counter = '\0'*(8-len(counter))+counter
+		hashedKey = self._hashKeys(decryptedKey,counter)
+		#print "".join("%02x" % b for b in hashedKey)
 
-			otp = self._getFinalOTP(hashedKey, self._getOffset(hashedKey, -1), 
-				int(self._config['digits']))
-			yield otp
-			self._config['counter'] = self._config['counter'] + 1
+		otp = self._getFinalOTP(hashedKey, self._getOffset(hashedKey, -1), 
+			int(self._config['digits']))
+		self._config['counter'] = self._config['counter'] + 1
+		return otp
+
+	def cryptSeed(self):
+		eseed = self._encryptKey(self._hashStr(self._config['pincode']), 
+			self._hexStringToString(self._config['iv']),
+			self._hexStringToString(self._config['seed']))
+		return binascii.b2a_hex(eseed)
+
 
 	
 class NOTP(object):
@@ -118,7 +126,6 @@ class NOTP(object):
 		_config['iv'] = 'a5e3fd9432eb48c36e53e93240056aed'
 		_config['counter'] = 0
 		_config['digits'] = 6
-		_config['blocksize'] = 16
 
 		otpGenerator = OTPGenerator(_config).getOTP()
 		for i in range(0, 10):
