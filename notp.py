@@ -17,8 +17,11 @@
 
 #from rijndael import rijndael
 
-import sha, hmac, sys, os
+import hmac, sys, os
 import binascii
+#import Crypto
+from Crypto.Cipher import AES
+import hashlib
 
 # NOTP version
 VERSION = "1.0"
@@ -29,43 +32,57 @@ class OTPGenerator(object):
 		"""Initializes a new OTPGenerator, by using configuration parameters"""
 		self._config = config
 
+	def _hashStr(self, code):
+		hdata = hashlib.sha1(code)
+		return hdata.digest()
+
 	def _hexStringToString(self, hexString):
 		"""Converts the given hex string to a characters string"""
 		strippedString = hexString.lstrip("0x").rstrip("L")
-
 		# a2b_hex only works with even length strings
 		if len(strippedString)%2:
 			strippedString = '0' + strippedString 
-		outputString = binascii.a2b_hex(strippedString)
+		return binascii.a2b_hex(strippedString)
 
-		return outputString
+	def _stripPadding(self, buffer):
+		count = ord(buffer[-1])
+		return buffer[:-count]
 
-	#def _decryptKey(self, key, buffer):
-	#	"""Decrypts the given buffer using Rijndael encryption algorithm (AES)"""
-	#	encryptor = rijndael(key, block_size = 16)
-	#
-	#	# decrypt both blocks
-	#	return "".join((encryptor.decrypt(buffer[:16]), encryptor.decrypt(buffer[16:])))
+	def _addPadding(self, buffer):
+		blocksize = self._config['blocksize']
+		pad = blocksize - (len(data) % blocksize)
+		data = data + pad * chr(pad)
+
+	def _decryptKey(self, key, iv, buffer):
+		cipher = AES.new(key[:16], AES.MODE_CBC, iv)
+		clear_buffer = cipher.decrypt(buffer)
+		clear_buffer = self._stripPadding(clear_buffer)
+		return clear_buffer
+
+	def _encryptKey(self, key, iv, buffer):
+		cipher = AES.new(key[:16], AES.MODE_CBC, iv)
+		buffer = self._addPadding(buffer)
+		ebuffer = cipher.encrypt(buffer)
+		return ebuffer
 
 	def _hashKeys(self, initKey, updateKey):
 		"""Returns an SHA-1 HMAC hash of the key"""
-		hMAC = hmac.new(initKey, updateKey, digestmod=sha)
-
-		return [ord(char) for char in hMAC.digest()]
+		hMAC = hmac.new(initKey, updateKey, digestmod=hashlib.sha1)
+		return hMAC.digest()
 
 	def _getOffset(self, hashResult, truncationOffset):
 		"""Retrieves the offset to calculate the OTP from"""
 		if truncationOffset < 0:
-			return hashResult[-1] & 0xF
+			return ord(hashResult[-1]) & 0xF
 		else:
 			return truncationOffset
 
 	def _getFinalOTP(self, hashResult, startingOffset, otpDigits):
 		"""Retrieves the final OTP, calculated from the hash"""
-		fullKey = (hashResult[startingOffset] & 0x7F) << 24 |\
-			(hashResult[startingOffset + 1] & 0xFF) << 16 |\
-			(hashResult[startingOffset + 2] & 0xFF) << 8 |\
-			hashResult[startingOffset + 3] & 0xFF
+		fullKey = (ord(hashResult[startingOffset]) & 0x7F) << 24 |\
+			(ord(hashResult[startingOffset + 1]) & 0xFF) << 16 |\
+			(ord(hashResult[startingOffset + 2]) & 0xFF) << 8 |\
+			ord(hashResult[startingOffset + 3]) & 0xFF
 		
 		finalKey = str(fullKey)
 		if len(finalKey) > otpDigits:
@@ -76,9 +93,9 @@ class OTPGenerator(object):
 	def getOTP(self):
 		"""Returns a genarator object for creating OTP's"""
 		while True:
-			#decryptedKey = self._decryptKey(self._padPinCode(self._config['pincode']), 
-			#	self._hexStringToString(self._config['key']))
-			decryptedKey = self._hexStringToString(self._config['key'])
+			decryptedKey = self._decryptKey(self._hashStr(self._config['pincode']), 
+				self._hexStringToString(self._config['iv']),
+				self._hexStringToString(self._config['seed']))
 
 			counter = self._hexStringToString(hex(self._config['counter']))
 			counter = '\0'*(8-len(counter))+counter
@@ -95,10 +112,13 @@ class NOTP(object):
 	def run(self):
 		"""Main NOTP entry point"""
 		_config = {}
-		_config['pincode'] = '123456'
-		_config['key'] = '3132333435363738393031323334353637383930'
+		_config['pincode'] = '7740'
+		#_config['key'] = '3132333435363738393031323334353637383930'
+		_config['seed'] = '626ebf4c79386ccda44d6c39fb5a3f61e5154d18351ae757d3c51d8db4e5bb57'
+		_config['iv'] = 'a5e3fd9432eb48c36e53e93240056aed'
 		_config['counter'] = 0
 		_config['digits'] = 6
+		_config['blocksize'] = 16
 
 		otpGenerator = OTPGenerator(_config).getOTP()
 		for i in range(0, 10):
