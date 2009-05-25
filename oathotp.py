@@ -17,12 +17,12 @@ class HotpData(db.Model):
 class OtpPage(webapp.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain'
-    if self.request.get('id'):
+    if self.request.get('id') and self.request.get('pin'):
       querys = HotpData.all()
       querys.filter('id =', self.request.get('id'))
       if querys.count() == 1:
         for query in querys:
-          self.response.out.write("%s %s\n" % (query.id, query.serialno))
+          self.response.out.write("%s %s\n\n" % (query.id, query.serialno))
 	  hconfig = dict()
 	  #fix this later, extract pin from full pin+otp
 	  hconfig['pincode'] = self.request.get('pin')
@@ -34,6 +34,11 @@ class OtpPage(webapp.RequestHandler):
 	  gen = hotpy.OTPGenerator(hconfig)
           self.response.out.write(gen.getOTP())
 	  query.sequence = query.sequence + 1
+	  #test
+	  if query.id == 'test':
+	    self.response.out.write("\n\ntest results are RFC4226 test vectors\n")
+	    if query.sequence == 10:
+	      query.sequence = 0
 	  query.put()
 
       elif querys.count() > 1:
@@ -68,7 +73,6 @@ class AdminPage(webapp.RequestHandler):
             </form>""")
       self.response.out.write("<br><a href=%s>Logout</a>" % users.create_logout_url(self.request.uri))
     else:
-      self.redirect(users.create_login_url(self.request.uri))
       self.response.out.write("<br><a href=%s>Login</a>" % users.create_login_url(self.request.uri))
     self.response.out.write("</body></html>")
 
@@ -111,15 +115,16 @@ class AdminPage(webapp.RequestHandler):
 
 class MainPage(webapp.RequestHandler):
   def get(self):
+    self.response.headers['Content-Type'] = 'text/plain'
     html_content = """
 Validate OATH token - connect to /otp?id=[id]&pin=[pin]
 response will be success or error
 
+try https://oathotp.appspot.com/otp?id=test&pin=1234
+
 """
     self.response.headers['Content-Type'] = 'text/plain'
-    self.response.out.write('Hello, webapp World!\n')
     self.response.out.write(html_content)
-    self.response.out.write(self.request.get('content'))
 
 application = webapp.WSGIApplication(
                                      [('/otp', OtpPage),
