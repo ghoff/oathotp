@@ -16,37 +16,50 @@ class HotpData(db.Model):
 
 class OtpPage(webapp.RequestHandler):
   def get(self):
+    success = 0
     self.response.headers['Content-Type'] = 'text/plain'
     if self.request.get('id') and self.request.get('pin'):
       querys = HotpData.all()
       querys.filter('id =', self.request.get('id'))
       if querys.count() == 1:
         for query in querys:
-          self.response.out.write("%s %s\n\n" % (query.id, query.serialno))
 	  hconfig = dict()
 	  #fix this later, extract pin from full pin+otp
-	  hconfig['pincode'] = self.request.get('pin')
+	  #extract pin from full pin+otp
+	  tmppin = self.request.get('pin')
+	  pinlen = len(tmppin)
+	  if pinlen < query.otpdigits:
+            self.response.out.write("status=BAD_PIN\n")
+	    return
+	  key = tmppin[:pinlen - query.otpdigits]
+	  pin = tmppin[pinlen - query.otpdigits:]
+	  hconfig['pincode'] = key
 	  hconfig['seed'] = query.seed
 	  hconfig['iv'] = query.iv
 	  hconfig['counter'] = query.sequence
 	  hconfig['digits'] = query.otpdigits
 	  # need to fix generator to work correctly with bad pin
 	  gen = hotpy.OTPGenerator(hconfig)
-          self.response.out.write(gen.getOTP())
-	  query.sequence = query.sequence + 1
-	  #test
-	  if query.id == 'test':
-	    self.response.out.write("\n\ntest results are RFC4226 test vectors\n")
-	    if query.sequence == 10:
-	      query.sequence = 0
-	  query.put()
-
+	  for loop in range(0, 10):
+            genpin = gen.getOTP()
+            #self.response.out.write("%s\n" % genpin)
+            #self.response.out.write("%s\n" % pin)
+	    if genpin == pin:
+	      success = 1
+	      break
+	  if success:
+            self.response.out.write("status=OK\n")
+	    query.sequence = query.sequence + loop + 1
+	    query.put()
+	  else:
+            self.response.out.write("status=FAILED\n")
       elif querys.count() > 1:
-        self.response.out.write("Error: mutiple entries not yet supported\n")
+        self.response.out.write("status=EXTENDED_ERROR\n")
+        self.response.out.write("info=Mutiple entries not yet supported\n")
       else:
-        self.response.out.write("Error: invalid ID\n")
+        self.response.out.write("status=BAD_ID\n")
     else:
-        self.response.out.write("Must include id request\n")
+        self.response.out.write("status=MISSING_PARAMETER\n")
 
 class AdminPage(webapp.RequestHandler):
   def get(self):
@@ -120,8 +133,6 @@ class MainPage(webapp.RequestHandler):
 Validate OATH token - connect to /otp?id=[id]&pin=[pin]
 response will be success or error
 
-try https://oathotp.appspot.com/otp?id=test&pin=1234
-
 """
     self.response.headers['Content-Type'] = 'text/plain'
     self.response.out.write(html_content)
@@ -130,7 +141,7 @@ application = webapp.WSGIApplication(
                                      [('/otp', OtpPage),
                                      ('/admin', AdminPage),
                                      ('/', MainPage)],
-                                     debug=False)
+                                     debug=True)
 
 def main():
   run_wsgi_app(application)
