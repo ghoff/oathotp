@@ -77,10 +77,10 @@ class AdminPage(webapp.RequestHandler):
 	    <table>
 	      <tr><td>id</td><td><input name="id" size=20></td></tr>
               <tr><td>serialno</td><td><input name="serialno" size=20></td></tr>
+              <tr><td>otp digits</td><td><input name="otpdigits" size=16></td></tr>
               <tr><td>sequence</td><td><input name="sequence" size=16></td></tr>
               <tr><td>pin</td><td><input name="pin" size=16></td></tr>
               <tr><td>seed</td><td><input name="seed" size=64></td></tr>
-              <tr><td>otp digits</td><td><input name="otpdigits" size=64></td></tr>
 	    </table>
               <input type="submit" value="add entry"></div>
             </form>""")
@@ -131,7 +131,9 @@ class MainPage(webapp.RequestHandler):
     self.response.headers['Content-Type'] = 'text/plain'
     html_content = """
 Validate OATH token - connect to /otp?id=[id]&pin=[pin]
-response will be success or error
+response will be status=OK, or error
+
+For source code, see http://github.com/ghoff/oathotp
 
 """
     self.response.headers['Content-Type'] = 'text/plain'
@@ -141,7 +143,7 @@ application = webapp.WSGIApplication(
                                      [('/otp', OtpPage),
                                      ('/admin', AdminPage),
                                      ('/', MainPage)],
-                                     debug=True)
+                                     debug=False)
 
 def main():
   run_wsgi_app(application)
