@@ -14,52 +14,80 @@ class HotpData(db.Model):
   sequence = db.IntegerProperty(required=True)
   otpdigits = db.IntegerProperty(required=True)
 
+class Utility():
+  def calc_otp(self, request):
+    success = 0
+    querys = HotpData.all()
+    querys.filter('id =', request.get('id'))
+    if querys.count() == 1:
+      for query in querys:
+        hconfig = dict()
+        #extract pin from full pin+otp
+        tmppin = request.get('pin')
+        pinlen = len(tmppin)
+        if pinlen < query.otpdigits:
+          out = "status=BAD_PIN"
+          return(out)
+        key = tmppin[:pinlen - query.otpdigits]
+        pin = tmppin[pinlen - query.otpdigits:]
+        hconfig['pincode'] = key
+        hconfig['seed'] = query.seed
+        hconfig['iv'] = query.iv
+        hconfig['counter'] = query.sequence
+        hconfig['digits'] = query.otpdigits
+        # need to fix generator to work correctly with bad pin
+        gen = hotpy.OTPGenerator(hconfig)
+        for loop in range(0, 10):
+          genpin = gen.getOTP()
+          if genpin == pin:
+             success = 1
+             break
+        if success:
+          out = "status=OK"
+          query.sequence = query.sequence + loop + 1
+          query.put()
+        else:
+          out = "status=FAILED"
+    elif querys.count() > 1:
+      out = "status=EXTENDED_ERROR\ninfo=Mutiple entries not yet supported"
+    else:
+      out = "status=BAD_ID"
+    return(out)
+
 class OtpPage(webapp.RequestHandler):
   def get(self):
-    success = 0
     self.response.headers['Content-Type'] = 'text/plain'
     if self.request.get('id') and self.request.get('pin'):
-      querys = HotpData.all()
-      querys.filter('id =', self.request.get('id'))
-      if querys.count() == 1:
-        for query in querys:
-	  hconfig = dict()
-	  #fix this later, extract pin from full pin+otp
-	  #extract pin from full pin+otp
-	  tmppin = self.request.get('pin')
-	  pinlen = len(tmppin)
-	  if pinlen < query.otpdigits:
-            self.response.out.write("status=BAD_PIN\n")
-	    return
-	  key = tmppin[:pinlen - query.otpdigits]
-	  pin = tmppin[pinlen - query.otpdigits:]
-	  hconfig['pincode'] = key
-	  hconfig['seed'] = query.seed
-	  hconfig['iv'] = query.iv
-	  hconfig['counter'] = query.sequence
-	  hconfig['digits'] = query.otpdigits
-	  # need to fix generator to work correctly with bad pin
-	  gen = hotpy.OTPGenerator(hconfig)
-	  for loop in range(0, 10):
-            genpin = gen.getOTP()
-            #self.response.out.write("%s\n" % genpin)
-            #self.response.out.write("%s\n" % pin)
-	    if genpin == pin:
-	      success = 1
-	      break
-	  if success:
-            self.response.out.write("status=OK\n")
-	    query.sequence = query.sequence + loop + 1
-	    query.put()
-	  else:
-            self.response.out.write("status=FAILED\n")
-      elif querys.count() > 1:
-        self.response.out.write("status=EXTENDED_ERROR\n")
-        self.response.out.write("info=Mutiple entries not yet supported\n")
-      else:
-        self.response.out.write("status=BAD_ID\n")
+      out = Utility().calc_otp(self.request)
+      self.response.out.write("%s\n" % out)
     else:
-        self.response.out.write("status=MISSING_PARAMETER\n")
+      self.response.out.write("status=MISSING_PARAMETER\n")
+
+
+class DemoPage(webapp.RequestHandler):
+  def get(self):
+    self.response.headers['Content-Type'] = 'text/html'
+    self.response.out.write("<html><head></head><body>\n")
+    self.response.out.write("""
+    <form action="/demo" method="post">
+    <table>
+      <tr><td>id</td><td><input name="id" type="text"size=20></td></tr>
+      <tr><td>otp</td><td><input name="pin" type="password" size=20></td></tr>
+    </table>
+    <input type="submit" value="test"></div>
+    </form>""")
+    self.response.out.write("</body></html>")
+
+  def post(self):
+    self.response.headers['Content-Type'] = 'text/plain'
+    id=self.request.get('id')
+    pin=self.request.get('pin')
+    if self.request.get('id') and self.request.get('pin'):
+      out = Utility().calc_otp(self.request)
+      self.response.out.write("%s\n" % out)
+    else:
+      self.response.out.write("status=MISSING_PARAMETER\n")
+
 
 class AdminPage(webapp.RequestHandler):
   def get(self):
@@ -128,20 +156,22 @@ class AdminPage(webapp.RequestHandler):
 
 class MainPage(webapp.RequestHandler):
   def get(self):
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/html'
     html_content = """
-Validate OATH token - connect to /otp?id=[id]&pin=[pin]
-response will be status=OK, or error
-
-For source code, see http://github.com/ghoff/oathotp
-
+<html><head></head><body>
+Validate OATH token - connect to /otp?id=[id]&pin=[pin]<br>
+response will be status=OK, or error<br>
+<br>
+For source code, see <a href="http://github.com/ghoff/oathotp">http://github.com/ghoff/oathotp</a><br>
+For demo, see <a href="demo">demo</a>
+</body></html>
 """
-    self.response.headers['Content-Type'] = 'text/plain'
     self.response.out.write(html_content)
 
 application = webapp.WSGIApplication(
                                      [('/otp', OtpPage),
                                      ('/admin', AdminPage),
+                                     ('/demo', DemoPage),
                                      ('/', MainPage)],
                                      debug=False)
 

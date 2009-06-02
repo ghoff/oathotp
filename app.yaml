@@ -12,6 +12,10 @@ handlers:
    script: oathotp.py
    secure: always
 
+ - url: /demo
+   script: oathotp.py
+   secure: always
+
  - url: /admin
    script: oathotp.py
    secure: always
