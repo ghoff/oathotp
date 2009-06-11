@@ -1,9 +1,10 @@
+from google.appengine.ext import db
 from google.appengine.api import users
 from google.appengine.ext import webapp
+from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp.util import run_wsgi_app
-from google.appengine.ext import db
-import hotpy
 import os
+import hotpy
 import binascii
 import string
 
@@ -96,31 +97,29 @@ class DemoPage(webapp.RequestHandler):
 
 class AdminPage(webapp.RequestHandler):
   def get(self):
+    admin = 0
+    login = 0
     self.response.headers['Content-Type'] = 'text/html'
-    self.response.out.write("<html><head></head><body>\n")
     user = users.get_current_user()
+    logout_url = users.create_logout_url(self.request.uri)
+    login_url = users.create_login_url(self.request.uri)
     if user and not users.is_current_user_admin():
-      self.response.out.write("Only admin users allowed\n")
-      self.response.out.write("<br><a href=%s>Logout</a>" % users.create_logout_url(self.request.uri))
-      self.response.out.write("</body></html>")
+      login = 1
     elif user and users.is_current_user_admin():
-      self.response.out.write("add a new value\n")
-      self.response.out.write("""
-            <form action="/admin" method="post">
-	    <table>
-	      <tr><td>id</td><td><input name="id" size=20></td></tr>
-              <tr><td>serialno</td><td><input name="serialno" size=20></td></tr>
-              <tr><td>otp digits</td><td><input name="otpdigits" size=16></td></tr>
-              <tr><td>sequence</td><td><input name="sequence" size=16></td></tr>
-              <tr><td>pin</td><td><input name="pin" size=16></td></tr>
-              <tr><td>seed</td><td><input name="seed" size=64></td></tr>
-	    </table>
-              <input type="submit" value="add entry"></div>
-            </form>""")
-      self.response.out.write("<br><a href=%s>Logout</a>" % users.create_logout_url(self.request.uri))
+      login = 1
+      admin = 1
     else:
-      self.response.out.write("<br><a href=%s>Login</a>" % users.create_login_url(self.request.uri))
-    self.response.out.write("</body></html>")
+      admin = 0
+      login = 0
+    template_values = {
+      'login' : login,
+      'admin' : admin,
+      'login_url' : login_url,
+      'logout_url' : logout_url,
+      }
+    path = os.path.join(os.path.dirname(__file__), 'admin.html')
+    self.response.out.write(template.render(path, template_values))
+
 
   def post(self):
     user = users.get_current_user()
@@ -162,16 +161,8 @@ class AdminPage(webapp.RequestHandler):
 class MainPage(webapp.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/html'
-    html_content = """
-<html><head></head><body>
-Validate OATH token - connect to /otp?id=[id]&pin=[pin]<br>
-response will be status=OK, or error<br>
-<br>
-For source code, see <a href="http://github.com/ghoff/oathotp">http://github.com/ghoff/oathotp</a><br>
-For demo, see <a href="demo">demo</a>
-</body></html>
-"""
-    self.response.out.write(html_content)
+    path = os.path.join(os.path.dirname(__file__), "index.html")
+    self.response.out.write(template.render(path,None))
 
 application = webapp.WSGIApplication(
                                      [('/otp', OtpPage),
