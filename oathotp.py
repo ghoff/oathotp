@@ -5,6 +5,7 @@ from google.appengine.ext import db
 import hotpy
 import os
 import binascii
+import string
 
 class HotpData(db.Model):
   id = db.StringProperty(required=True)
@@ -17,13 +18,19 @@ class HotpData(db.Model):
 class Utility():
   def calc_otp(self, request):
     success = 0
+    allowed = string.ascii_letters + string.digits + "-_"
+    delete_table = string.maketrans(allowed, ' ' * len(allowed))
+    table = string.maketrans('', '')
+    id = str(request.get('id'))
+    id = id.translate(table, delete_table)
     querys = HotpData.all()
-    querys.filter('id =', request.get('id'))
+    querys.filter('id =', id)
     if querys.count() == 1:
       for query in querys:
         hconfig = dict()
         #extract pin from full pin+otp
-        tmppin = request.get('pin')
+        tmppin = str(request.get('pin'))
+        tmppin = tmppin.translate(table, delete_table)
         pinlen = len(tmppin)
         if pinlen < query.otpdigits:
           out = "status=BAD_PIN"
@@ -80,8 +87,6 @@ class DemoPage(webapp.RequestHandler):
 
   def post(self):
     self.response.headers['Content-Type'] = 'text/plain'
-    id=self.request.get('id')
-    pin=self.request.get('pin')
     if self.request.get('id') and self.request.get('pin'):
       out = Utility().calc_otp(self.request)
       self.response.out.write("%s\n" % out)
