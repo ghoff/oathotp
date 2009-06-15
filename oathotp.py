@@ -16,57 +16,56 @@ class HotpData(db.Model):
   sequence = db.IntegerProperty(required=True)
   otpdigits = db.IntegerProperty(required=True)
 
-class Utility():
-  def calc_otp(self, request):
-    success = 0
-    allowed = string.ascii_letters + string.digits + "-_"
-    delete_table = string.maketrans(allowed, ' ' * len(allowed))
-    table = string.maketrans('', '')
-    id = str(request.get('id'))
-    id = id.translate(table, delete_table)
-    querys = HotpData.all()
-    querys.filter('id =', id)
-    if querys.count() == 1:
-      for query in querys:
-        hconfig = dict()
-        #extract pin from full pin+otp
-        tmppin = str(request.get('pin'))
-        tmppin = tmppin.translate(table, delete_table)
-        pinlen = len(tmppin)
-        if pinlen < query.otpdigits:
-          out = "status=BAD_PIN"
-          return(out)
-        key = tmppin[:pinlen - query.otpdigits]
-        pin = tmppin[pinlen - query.otpdigits:]
-        hconfig['pincode'] = key
-        hconfig['seed'] = query.seed
-        hconfig['iv'] = query.iv
-        hconfig['counter'] = query.sequence
-        hconfig['digits'] = query.otpdigits
-        # need to fix generator to work correctly with bad pin
-        gen = hotpy.OTPGenerator(hconfig)
-        for loop in range(0, 10):
-          genpin = gen.getOTP()
-          if genpin == pin:
-             success = 1
-             break
-        if success:
-          out = "status=OK"
-          query.sequence = query.sequence + loop + 1
-          query.put()
-        else:
-          out = "status=FAILED"
-    elif querys.count() > 1:
-      out = "status=EXTENDED_ERROR\ninfo=Mutiple entries not yet supported"
-    else:
-      out = "status=BAD_ID"
-    return(out)
+def calc_otp(request):
+  success = 0
+  allowed = string.ascii_letters + string.digits + "-_"
+  delete_table = string.maketrans(allowed, ' ' * len(allowed))
+  table = string.maketrans('', '')
+  id = str(request.get('id'))
+  #strip all but ascii letters, numbers, dash and underscore
+  id = id.translate(table, delete_table)
+  querys = HotpData.all()
+  querys.filter('id =', id)
+  if querys.count() >= 1:
+    for query in querys:
+      hconfig = dict()
+      #extract pin from full pin+otp
+      tmppin = str(request.get('pin'))
+      tmppin = tmppin.translate(table, delete_table)
+      pinlen = len(tmppin)
+      if pinlen < query.otpdigits:
+        out = "status=BAD_PIN"
+        return(out)
+      key = tmppin[:pinlen - query.otpdigits]
+      pin = tmppin[pinlen - query.otpdigits:]
+      hconfig['pincode'] = key
+      hconfig['seed'] = query.seed
+      hconfig['iv'] = query.iv
+      hconfig['counter'] = query.sequence
+      hconfig['digits'] = query.otpdigits
+      # need to fix generator to work correctly with bad pin
+      gen = hotpy.OTPGenerator(hconfig)
+      for loop in range(0, 10):
+        genpin = gen.getOTP()
+        if genpin == pin:
+           success = 1
+           break
+      if success:
+        out = "status=OK"
+        query.sequence = query.sequence + loop + 1
+        query.put()
+	break
+    if success != 1:
+      out = "status=FAILED"
+  else:
+    out = "status=BAD_ID"
+  return(out)
 
 class OtpPage(webapp.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain'
     if self.request.get('id') and self.request.get('pin'):
-      out = Utility().calc_otp(self.request)
+      out = calc_otp(self.request)
       self.response.out.write("%s\n" % out)
     else:
       self.response.out.write("status=MISSING_PARAMETER\n")
@@ -75,21 +74,13 @@ class OtpPage(webapp.RequestHandler):
 class DemoPage(webapp.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/html'
-    self.response.out.write("<html><head></head><body>\n")
-    self.response.out.write("""
-    <form action="/demo" method="post">
-    <table>
-      <tr><td>id</td><td><input name="id" type="text"size=20></td></tr>
-      <tr><td>otp</td><td><input name="pin" type="password" size=20></td></tr>
-    </table>
-    <input type="submit" value="test"></div>
-    </form>""")
-    self.response.out.write("</body></html>")
+    path = os.path.join(os.path.dirname(__file__), 'template/demo.html')
+    self.response.out.write(template.render(path, template_values))
 
   def post(self):
     self.response.headers['Content-Type'] = 'text/plain'
     if self.request.get('id') and self.request.get('pin'):
-      out = Utility().calc_otp(self.request)
+      out = calc_otp(self.request)
       self.response.out.write("%s\n" % out)
     else:
       self.response.out.write("status=MISSING_PARAMETER\n")
@@ -103,21 +94,13 @@ class AdminPage(webapp.RequestHandler):
     user = users.get_current_user()
     logout_url = users.create_logout_url(self.request.uri)
     login_url = users.create_login_url(self.request.uri)
-    if user and not users.is_current_user_admin():
+    if user:
       login = 1
-    elif user and users.is_current_user_admin():
-      login = 1
+    if users.is_current_user_admin():
       admin = 1
-    else:
-      admin = 0
-      login = 0
-    template_values = {
-      'login' : login,
-      'admin' : admin,
-      'login_url' : login_url,
-      'logout_url' : logout_url,
-      }
-    path = os.path.join(os.path.dirname(__file__), 'admin.html')
+    template_values = { 'login' : login, 'admin' : admin,
+      'login_url' : login_url, 'logout_url' : logout_url }
+    path = os.path.join(os.path.dirname(__file__), 'template/admin.html')
     self.response.out.write(template.render(path, template_values))
 
 
@@ -158,17 +141,10 @@ class AdminPage(webapp.RequestHandler):
     else:
       self.response.out.write("Access Denied.")
 
-class MainPage(webapp.RequestHandler):
-  def get(self):
-    self.response.headers['Content-Type'] = 'text/html'
-    path = os.path.join(os.path.dirname(__file__), "index.html")
-    self.response.out.write(template.render(path,None))
-
 application = webapp.WSGIApplication(
                                      [('/otp', OtpPage),
                                      ('/admin', AdminPage),
-                                     ('/demo', DemoPage),
-                                     ('/', MainPage)],
+                                     ('/demo', DemoPage)],
                                      debug=False)
 
 def main():

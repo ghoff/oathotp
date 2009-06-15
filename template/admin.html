@@ -1,12 +1,7 @@
 <html>
-  <head>
-    <title>Admin</title>
-  </head>
+  <head><title>Admin</title></head>
   <body>
-    {% if login and not admin %}
-    Only admin users allowed<br>
-    <a href={{logout_url}}>Logout</a>
-    {% else %}{% if admin %}
+    {% if admin %}
     add a new value
     <form action="/admin" method="post">
       <table>
@@ -18,10 +13,13 @@
         <tr><td>seed</td><td><input name="seed" size=64></td></tr>
       </table>
       <input type="submit" value="add entry"></div>
-    </form><br>
+    </form>
+    {% endif %} {% if login and not admin %}
+    Only admin users allowed<br>
+    {% endif %} {% if login %}
     <a href={{logout_url}}>Logout</a>
     {% else %}
     <a href={{login_url}}>Login</a>
-    {% endif %}{% endif %}
+    {% endif %}
   </body>
 </html>

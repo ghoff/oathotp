@@ -20,6 +20,10 @@ handlers:
    script: oathotp.py
    secure: always
 
+ - url: /
+   static_files: template/index.html
+   upload: template/index.html
+
  - url: /.*
    script: oathotp.py
    secure: optional
