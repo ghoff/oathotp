@@ -1,3 +1,4 @@
+#    Copyright (C) 2009 Geoff Hoff, http://github.com/ghoff
 #    Copyright (C) 2008 Yaron Inger, http://ingeration.blogspot.com
 #
 #    This program is free software; you can redistribute it and/or modify
