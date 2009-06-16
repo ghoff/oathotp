@@ -23,6 +23,7 @@ handlers:
  - url: /
    static_files: template/index.html
    upload: template/index.html
+   secure: optional
 
  - url: /.*
    script: oathotp.py

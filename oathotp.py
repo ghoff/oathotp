@@ -75,7 +75,7 @@ class DemoPage(webapp.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/html'
     path = os.path.join(os.path.dirname(__file__), 'template/demo.html')
-    self.response.out.write(template.render(path, template_values))
+    self.response.out.write(template.render(path, None))
 
   def post(self):
     self.response.headers['Content-Type'] = 'text/plain'
