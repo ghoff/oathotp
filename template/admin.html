@@ -1,5 +1,10 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
 <html>
-  <head><title>Admin</title></head>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+    <title>Admin</title>
+  </head>
   <body>
     {% if admin %}
     add a new value
@@ -17,9 +22,9 @@
     {% endif %} {% if login and not admin %}
     Only admin users allowed<br>
     {% endif %} {% if login %}
-    <a href={{logout_url}}>Logout</a>
+    <a href="{{logout_url}}">Logout</a>
     {% else %}
-    <a href={{login_url}}>Login</a>
+    <a href="{{login_url}}">Login</a>
     {% endif %}
   </body>
 </html>
