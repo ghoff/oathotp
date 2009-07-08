@@ -1,4 +1,5 @@
 #    Copyright (C) 2009 Geoff Hoff, http://github.com/ghoff
+#    Based largely on notp by
 #    Copyright (C) 2008 Yaron Inger, http://ingeration.blogspot.com
 #
 #    This program is free software; you can redistribute it and/or modify
@@ -16,16 +17,10 @@
 #    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #    or download it from http://www.gnu.org/licenses/gpl.txt
 
-#from rijndael import rijndael
-
 import hmac, sys, os
 import binascii
-#import Crypto
 from Crypto.Cipher import AES
 import hashlib
-
-# NOTP version
-VERSION = "1.0"
 
 class OTPGenerator(object):
 
@@ -46,6 +41,7 @@ class OTPGenerator(object):
 			strippedString = '0' + strippedString 
 		return binascii.a2b_hex(strippedString)
 
+	#TODO: need to add error detection
 	def _stripPadding(self, buffer):
 		count = ord(buffer[-1])
 		return buffer[:-count]
@@ -53,7 +49,7 @@ class OTPGenerator(object):
 	def _addPadding(self, buffer):
 		blocksize = self._config['blocksize']
 		pad = blocksize - (len(buffer) % blocksize)
-		buffer = buffer + pad * chr(pad)
+		buffer = buffer + (pad * chr(pad))
 		return buffer
 
 	def _decryptKey(self, key, iv, buffer):
@@ -100,6 +96,7 @@ class OTPGenerator(object):
 			self._hexStringToString(self._config['seed']))
 
 		counter = self._hexStringToString(hex(self._config['counter']))
+		# counter must be 8 bytes, pad to proper length
 		counter = '\0'*(8-len(counter))+counter
 		hashedKey = self._hashKeys(decryptedKey,counter)
 		#print "".join("%02x" % b for b in hashedKey)
