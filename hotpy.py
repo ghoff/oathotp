@@ -82,13 +82,13 @@ class OTPGenerator(object):
 			(ord(hashResult[startingOffset + 1]) & 0xFF) << 16 |\
 			(ord(hashResult[startingOffset + 2]) & 0xFF) << 8 |\
 			ord(hashResult[startingOffset + 3]) & 0xFF
-		
+
 		finalKey = str(fullKey)
 		if len(finalKey) > otpDigits:
 			finalKey = finalKey[len(finalKey) - otpDigits:]
-		
+
 		return finalKey
-	
+
 	def getOTP(self):
 		"""Returns a genarator object for creating OTP's"""
 		decryptedKey = self._decryptKey(self._hashStr(self._config['pincode']), 
@@ -113,7 +113,7 @@ class OTPGenerator(object):
 		return binascii.b2a_hex(eseed)
 
 
-	
+
 class NOTP(object):
 	def run(self):
 		"""Main NOTP entry point"""
