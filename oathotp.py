@@ -133,7 +133,7 @@ class AdminPage(webapp.RequestHandler):
 			hconfig = {}
 			hconfig['pincode'] = pin
 			hconfig['seed'] = seed
-			encseed = hotpy.OTPGenerator(hconfig)
+			encseed = hotpy.HOTP(hconfig)
 			eseed, iv = encseed.cryptSeed()
 
 			self.response.out.write("id = %s\n" % id)
