@@ -1,6 +1,7 @@
 #    Copyright (C) 2009 Geoff Hoff, http://github.com/ghoff
-#    Based largely on notp by
-#    Copyright (C) 2008 Yaron Inger, http://ingeration.blogspot.com
+#    Based on notp by
+#    Copyright (C) 2008 Yaron Inger, http://ingeration.blogspot.com,
+#    http://idsvandermolen.com/codefiles/crypto.py
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
