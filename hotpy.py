@@ -18,36 +18,39 @@
 #    or download it from http://www.gnu.org/licenses/gpl.txt
 
 import hmac, sys, os
-import binascii
+import binascii, struct
 from Crypto.Cipher import AES
 import hashlib
 
-class OTPGenerator(object):
+class HOTP(object):
 
 	def __init__(self, config):
-		"""Initializes a new OTPGenerator, by using configuration parameters"""
+		"""Initializes a new HOTP instance, by using configuration parameters
+		For getOTP, config must include
+		pincode = pin used to encrypt seed
+		seed = encrypted seed record
+		iv = initalization vector used to encrypt seed
+		digits = number of digits of generated otp
+		offset = otp offset, defaults to -1
+		For cryptSeed, only pincode and seed are required"""
 		self._config = config
-		self._config['blocksize'] = 16
+		self._decryptedKey = None
+		self._blocksize = 16
+		if not self._config.has_key('offset'):
+			self._config['offset'] = -1
 
 	def _hashStr(self, code):
 		hdata = hashlib.sha1(code)
 		return hdata.digest()
 
-	def _hexStringToString(self, hexString):
-		"""Converts the given hex string to a characters string"""
-		strippedString = hexString.lstrip("0x").rstrip("L")
-		# a2b_hex only works with even length strings
-		if len(strippedString)%2:
-			strippedString = '0' + strippedString 
-		return binascii.a2b_hex(strippedString)
-
-	#TODO: need to add error detection
 	def _stripPadding(self, buffer):
 		count = ord(buffer[-1])
+		if count > self._blocksize or count >= len(buffer):
+			raise Exception, "decryption failure"
 		return buffer[:-count]
 
 	def _addPadding(self, buffer):
-		blocksize = self._config['blocksize']
+		blocksize = self._blocksize
 		pad = blocksize - (len(buffer) % blocksize)
 		buffer = buffer + (pad * chr(pad))
 		return buffer
@@ -64,7 +67,7 @@ class OTPGenerator(object):
 		ebuffer = cipher.encrypt(buffer)
 		return ebuffer
 
-	def _hashKeys(self, initKey, updateKey):
+	def _HMACKeys(self, initKey, updateKey):
 		"""Returns an SHA-1 HMAC hash of the key"""
 		hMAC = hmac.new(initKey, updateKey, digestmod=hashlib.sha1)
 		return hMAC.digest()
@@ -82,56 +85,52 @@ class OTPGenerator(object):
 			(ord(hashResult[startingOffset + 1]) & 0xFF) << 16 |\
 			(ord(hashResult[startingOffset + 2]) & 0xFF) << 8 |\
 			ord(hashResult[startingOffset + 3]) & 0xFF
-
 		finalKey = str(fullKey)
 		if len(finalKey) > otpDigits:
-			finalKey = finalKey[len(finalKey) - otpDigits:]
-
+			finalKey = finalKey[-otpDigits:]
 		return finalKey
 
-	def getOTP(self):
+	def _decrypt_key(self):
+		if not self._config.has_key('iv'):
+			raise Exception, "iv not set"
+		self._decryptedKey = self._decryptKey(self._hashStr(self._config['pincode']), 
+			binascii.a2b_hex(self._config['iv']),
+			binascii.a2b_hex(self._config['seed']))
+
+	def getOTP(self, counter):
 		"""Returns a genarator object for creating OTP's"""
-		decryptedKey = self._decryptKey(self._hashStr(self._config['pincode']), 
-			self._hexStringToString(self._config['iv']),
-			self._hexStringToString(self._config['seed']))
-
-		counter = self._hexStringToString(hex(self._config['counter']))
-		# counter must be 8 bytes, pad to proper length
-		counter = '\0'*(8-len(counter))+counter
-		hashedKey = self._hashKeys(decryptedKey,counter)
-		#print "".join("%02x" % b for b in hashedKey)
-
-		otp = self._getFinalOTP(hashedKey, self._getOffset(hashedKey, -1), 
-			int(self._config['digits']))
-		self._config['counter'] = self._config['counter'] + 1
+		# decrypt key if not already decrypted
+		if not self._decryptedKey:
+			self._decrypt_key()
+		# counter must be 8 bytes big endian, pad to proper length
+		counter = struct.pack('>q', counter)
+		hashedKey = self._HMACKeys(self._decryptedKey, counter)
+		offset = self._getOffset(hashedKey, self._config['offset'])
+		otp = self._getFinalOTP(hashedKey, offset, self._config['digits'])
 		return otp
 
 	def cryptSeed(self):
+		iv = os.urandom(self._blocksize)
 		eseed = self._encryptKey(self._hashStr(self._config['pincode']), 
-			self._hexStringToString(self._config['iv']),
-			self._hexStringToString(self._config['seed']))
-		return binascii.b2a_hex(eseed)
+			iv, binascii.a2b_hex(self._config['seed']))
+		return binascii.b2a_hex(eseed), binascii.b2a_hex(iv)
 
 
+def test():
+	config = {}
+	#_config['key'] = '3132333435363738393031323334353637383930'
+	config['pincode'] = '7740'
+	config['seed'] = '626ebf4c79386ccda44d6c39fb5a3f61e5154d18351ae757d3c51d8db4e5bb57'
+	config['iv'] = 'a5e3fd9432eb48c36e53e93240056aed'
+	config['digits'] = 6
 
-class NOTP(object):
-	def run(self):
-		"""Main NOTP entry point"""
-		_config = {}
-		_config['pincode'] = '7740'
-		#_config['key'] = '3132333435363738393031323334353637383930'
-		_config['seed'] = '626ebf4c79386ccda44d6c39fb5a3f61e5154d18351ae757d3c51d8db4e5bb57'
-		_config['iv'] = 'a5e3fd9432eb48c36e53e93240056aed'
-		_config['counter'] = 0
-		_config['digits'] = 6
-
-		otpGenerator = OTPGenerator(_config).getOTP()
-		for i in range(0, 10):
-			print otpGenerator.next()
+	otp = HOTP(config)
+	for i in range(0, 10):
+		print otp.getOTP(i)
 
 
 if __name__ == "__main__":
-	NOTP().run()
+	test()
 
 """ RFC4226
 Appendix D - HOTP Algorithm: Test Values

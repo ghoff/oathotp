@@ -1,18 +1,18 @@
-#		Copyright (C) 2009 Geoff Hoff, http://github.com/ghoff
+#  Copyright (C) 2009 Geoff Hoff, http://github.com/ghoff
 #
-#		This program is free software; you can redistribute it and/or modify
-#		it under the terms of the GNU General Public License as published by
-#		the Free Software Foundation; version 2 of the License.
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; version 2 of the License.
 #
-#		This program is distributed in the hope that it will be useful,
-#		but WITHOUT ANY WARRANTY; without even the implied warranty of
-#		MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
-#		GNU General Public License for more details.
-#
-#		You should have received a copy of the GNU General Public License
-#		along with this program; if not, write to the Free Software
-#		Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA	02111-1307	USA
-#		or download it from http://www.gnu.org/licenses/gpl.txt
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
+#  GNU General Public License for more details.
+
+#  You should have received a copy of the GNU General Public License
+#  along with this program; if not, write to the Free Software
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+#  or download it from http://www.gnu.org/licenses/gpl.txt
 
 from google.appengine.ext import db
 from google.appengine.api import users
@@ -33,7 +33,7 @@ class HotpData(db.Model):
 	otpdigits = db.IntegerProperty(required=True)
 
 def calc_otp(request):
-	success = 0
+	success = False
 	allowed = string.ascii_letters + string.digits + "-_"
 	delete_table = string.maketrans(allowed, ' ' * len(allowed))
 	table = string.maketrans('', '')
@@ -44,7 +44,7 @@ def calc_otp(request):
 	querys.filter('id =', id)
 	if querys.count() >= 1:
 		for query in querys:
-			hconfig = dict()
+			hconfig = {}
 			#extract pin from full pin+otp
 			tmppin = str(request.get('pin'))
 			tmppin = tmppin.translate(table, delete_table)
@@ -57,21 +57,20 @@ def calc_otp(request):
 			hconfig['pincode'] = key
 			hconfig['seed'] = query.seed
 			hconfig['iv'] = query.iv
-			hconfig['counter'] = query.sequence
 			hconfig['digits'] = query.otpdigits
 			# need to fix generator to work correctly with bad pin
-			gen = hotpy.OTPGenerator(hconfig)
+			otp = hotpy.HOTP(hconfig)
 			for loop in range(0, 10):
-				genpin = gen.getOTP()
+				genpin = otp.getOTP(loop + query.sequence)
 				if genpin == pin:
-					 success = 1
+					 success = True
 					 break
 			if success:
 				out = "status=OK"
 				query.sequence = query.sequence + loop + 1
 				query.put()
-	break
-		if success != 1:
+				break
+		if not success:
 			out = "status=FAILED"
 	else:
 		out = "status=BAD_ID"
@@ -131,13 +130,11 @@ class AdminPage(webapp.RequestHandler):
 			seed=self.request.get('seed')
 			otpdigits=self.request.get('otpdigits')
 
-			iv = binascii.b2a_hex(os.urandom(16))
 			hconfig = {}
 			hconfig['pincode'] = pin
 			hconfig['seed'] = seed
-			hconfig['iv'] = iv
 			encseed = hotpy.OTPGenerator(hconfig)
-			eseed = encseed.cryptSeed()
+			eseed, iv = encseed.cryptSeed()
 
 			self.response.out.write("id = %s\n" % id)
 			self.response.out.write("serialno = %s\n" % serialno)
