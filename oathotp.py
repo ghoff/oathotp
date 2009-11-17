@@ -2,7 +2,8 @@
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; version 2 of the License.
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
 #
 #  This program is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -61,7 +62,10 @@ def calc_otp(request):
 			# need to fix generator to work correctly with bad pin
 			otp = hotpy.HOTP(hconfig)
 			for loop in range(0, 10):
-				genpin = otp.getOTP(loop + query.sequence)
+				try:
+					genpin = otp.getOTP(loop + query.sequence)
+				except Exception, err:
+					break
 				if genpin == pin:
 					 success = True
 					 break
@@ -158,7 +162,7 @@ application = webapp.WSGIApplication(
 				[('/otp', OtpPage),
 				('/admin', AdminPage),
 				('/demo', DemoPage)],
-		 		debug=False)
+				debug=False)
 
 def main():
 	run_wsgi_app(application)
