@@ -1,7 +1,8 @@
-application: freeotp
+application: freeotp-hrd
 version: 1
-runtime: python
+runtime: python27
 api_version: 1
+threadsafe: false
 
 handlers:
  - url: /favicon.ico
@@ -28,3 +29,10 @@ handlers:
  - url: /.*
    script: oathotp.py
    secure: optional
+
+libraries:
+ - name: django
+   version: 1.2
+
+ - name: pycrypto
+   version: 2.3
